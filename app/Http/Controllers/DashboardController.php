@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Task;
+use App\Services\QuoteService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -50,12 +51,36 @@ class DashboardController extends Controller
             ->sort()
             ->values();
         
+        // Get motivational quote
+        $quoteService = new QuoteService();
+        $quote = $quoteService->getCachedQuote();
+        
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
             'search' => $search,
             'statusFilter' => $statusFilter,
             'tagFilters' => $tagFilters,
-            'availableTags' => $availableTags
+            'availableTags' => $availableTags,
+            'quote' => $quote
         ]);
+    }
+
+    /**
+     * Refresh the motivational quote
+     */
+    public function refreshQuote()
+    {
+        $quoteService = new QuoteService();
+        $quote = $quoteService->refreshQuote();
+        
+        return response()->json($quote);
+    }
+
+    /**
+     * Redirect to API endpoint for quote refresh
+     */
+    public function redirectToApiQuote()
+    {
+        return redirect()->route('api.quotes.refresh');
     }
 } 
