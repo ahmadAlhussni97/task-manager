@@ -2,7 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
-import QuoteShow from '@/Pages/Quote/Show.vue';
+import QuoteShow from '@/Components/Quote.vue';
 
 const props = defineProps({
     tasks: {
