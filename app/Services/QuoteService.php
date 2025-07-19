@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class QuoteService
 {
@@ -17,7 +18,9 @@ class QuoteService
     public function getRandomQuote(): array
     {
         try {
-            $response = Http::timeout(10)->get(self::API_URL);
+            $response = Http::timeout(10)
+                ->withoutVerifying() // Disable SSL certificate verification
+                ->get(self::API_URL);
             
             if ($response->successful()) {
                 $data = $response->json();
@@ -38,10 +41,13 @@ class QuoteService
             ];
             
         } catch (\Exception $e) {
+            // Log the error for debugging
+            Log::error('Quote API error: ' . $e->getMessage());
+            
             return [
-                'content' => '',
-                'author' => '',
-                'tags' => [''],
+                'content' => 'The only way to do great work is to love what you do.',
+                'author' => 'Steve Jobs',
+                'tags' => ['motivation', 'success'],
                 'success' => false
             ];
         }
