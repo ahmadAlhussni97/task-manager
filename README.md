@@ -65,15 +65,6 @@ php artisan migrate
 # Seed the database with sample data
 php artisan db:seed
 
-
-### 6. Build Assets
-```bash
-# For development
-npm run dev
-
-# For production
-npm run build
-
 ## 🏃‍♂️ Running the Application
 
 ### Development Mode
@@ -177,7 +168,7 @@ LOG_LEVEL=debug
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=task-manager
+DB_DATABASE=task_manager
 DB_USERNAME=
 DB_PASSWORD=
 
