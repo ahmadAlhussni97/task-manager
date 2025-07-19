@@ -25,6 +25,9 @@ class DashboardController extends Controller
             $tagFilters = [$request->get('tag')];
         }
         
+        $perPage = $request->get('per_page', 10); // Default 10 items per page
+        $page = $request->get('page', 1); // Current pagel items   
+        
         $tasks = Task::where('user_id', Auth::id())
             ->when($search, function ($query) use ($search) {
                 $query->search($search);
@@ -40,7 +43,7 @@ class DashboardController extends Controller
                 });
             })
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate($perPage, ['*'], 'page', $page);
         
         // Get available tags for filter dropdown
         $availableTags = Task::where('user_id', Auth::id())
@@ -54,7 +57,8 @@ class DashboardController extends Controller
         // Get motivational quote
         $quoteService = new QuoteService();
         $quote = $quoteService->getCachedQuote();
-        
+
+    
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
             'search' => $search,

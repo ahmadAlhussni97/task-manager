@@ -5,8 +5,8 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 
 const props = defineProps({
     tasks: {
-        type: Array,
-        default: () => []
+        type: Object, // Changed to Object for pagination
+        default: () => ({ data: [], links: [], meta: {} })
     },
     search: {
         type: String,
@@ -42,6 +42,10 @@ const showTagDropdown = ref(false);
 const tagSearchQuery = ref('');
 const currentQuote = ref(props.quote);
 const isRefreshingQuote = ref(false);
+
+// Pagination state
+const currentPage = ref(props.tasks.meta?.current_page || 1);
+const perPage = ref(props.tasks.meta?.per_page || 10);
 
 
 
@@ -85,7 +89,11 @@ const updateFilters = () => {
     if (searchQuery.value) params.search = searchQuery.value;
     if (statusFilter.value) params.status = statusFilter.value;
     if (tagFilters.value.length > 0) params.tags = tagFilters.value;
-    
+    if (perPage.value !== 10) params.per_page = perPage.value;
+
+    // Reset to first page when filters change
+    currentPage.value = 1;
+
     router.get(route('dashboard'), params, {
         preserveState: true,
         preserveScroll: true,
@@ -102,6 +110,33 @@ const clearFilters = () => {
     statusFilter.value = '';
     tagFilters.value = [];
     tagSearchQuery.value = '';
+    currentPage.value = 1;
+};
+
+// Pagination functions
+const goToPage = (page) => {
+    if (page < 1 || page > props.tasks.meta?.last_page) return;
+
+    const params = {};
+    if (searchQuery.value) params.search = searchQuery.value;
+    if (statusFilter.value) params.status = statusFilter.value;
+    if (tagFilters.value.length > 0) params.tags = tagFilters.value;
+    if (perPage.value !== 10) params.per_page = perPage.value;
+    if (page > 1) params.page = page;
+
+    currentPage.value = page;
+
+    router.get(route('dashboard'), params, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+};
+
+const changePerPage = (newPerPage) => {
+    perPage.value = newPerPage;
+    currentPage.value = 1;
+    updateFilters();
 };
 
 const toggleTag = (tag) => {
@@ -124,9 +159,38 @@ const filteredAvailableTags = computed(() => {
     if (!tagSearchQuery.value) {
         return props.availableTags;
     }
-    return props.availableTags.filter(tag => 
+    return props.availableTags.filter(tag =>
         tag.toLowerCase().includes(tagSearchQuery.value.toLowerCase())
     );
+});
+
+// Pagination computed properties
+const paginationInfo = computed(() => {
+
+    const meta = props.tasks || {};
+    return {
+        currentPage: meta.current_page || 1,
+        lastPage: meta.last_page || 1,
+        perPage: meta.per_page || 10,
+        total: meta.total || 0,
+        from: meta.from || 0,
+        to: meta.to || 0,
+        hasMorePages: meta.current_page < meta.last_page,
+        hasPreviousPages: meta.current_page > 1
+    };
+});
+
+const paginationLinks = computed(() => {
+    const links = props.tasks.links || [];
+    // Filter out Previous and Next links, only keep page numbers
+    return links.filter(link => {
+        const label = link.label;
+        return label !== '&laquo; Previous' &&
+            label !== 'Next &raquo;' &&
+            label !== 'Previous' &&
+            label !== 'Next' &&
+            label !== '...';
+    });
 });
 
 // Close dropdown when clicking outside
@@ -151,7 +215,7 @@ const refreshQuote = async () => {
     try {
         // Get CSRF token from meta tag or use empty string as fallback
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        
+
         const response = await fetch(route('api.quotes.refresh'), {
             method: 'POST',
             headers: {
@@ -160,7 +224,7 @@ const refreshQuote = async () => {
                 'Accept': 'application/json',
             },
         });
-        
+
         if (response.ok) {
             const responseData = await response.json();
             if (responseData.success) {
@@ -180,26 +244,14 @@ const refreshQuote = async () => {
         isRefreshingQuote.value = false;
     }
 };
+
 </script>
 
 <template>
+
     <Head title="Dashboard" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                    Task Manager Dashboard
-                </h2>
-                <a
-                    :href="route('tasks.create')"
-                    class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                    Create New Task
-                </a>
-            </div>
-        </template>
-
         <div class="py-12">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
                 <!-- Motivational Quote Section -->
@@ -209,7 +261,9 @@ const refreshQuote = async () => {
                             <div class="flex-1">
                                 <div class="flex items-center mb-2">
                                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                                        <path fill-rule="evenodd"
+                                            d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                                            clip-rule="evenodd"></path>
                                     </svg>
                                     <span class="text-sm font-medium opacity-90">Daily Motivation</span>
                                 </div>
@@ -219,27 +273,28 @@ const refreshQuote = async () => {
                                 <cite class="text-sm opacity-90">
                                     — {{ currentQuote.author }}
                                 </cite>
-                                <div v-if="currentQuote.tags && currentQuote.tags.length > 0" class="flex flex-wrap gap-1 mt-3">
-                                    <span
-                                        v-for="tag in currentQuote.tags"
-                                        :key="tag"
-                                        class="px-2 py-1 text-xs font-medium bg-white bg-opacity-20 rounded-full"
-                                    >
+                                <div v-if="currentQuote.tags && currentQuote.tags.length > 0"
+                                    class="flex flex-wrap gap-1 mt-3">
+                                    <span v-for="tag in currentQuote.tags" :key="tag"
+                                        class="px-2 py-1 text-xs font-medium bg-white bg-opacity-20 rounded-full">
                                         {{ tag }}
                                     </span>
                                 </div>
                             </div>
-                            <button
-                                @click="refreshQuote"
-                                :disabled="isRefreshingQuote"
+                            <button @click="refreshQuote" :disabled="isRefreshingQuote"
                                 class="ml-4 p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
-                                title="Refresh quote"
-                            >
-                                <svg v-if="!isRefreshingQuote" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                title="Refresh quote">
+                                <svg v-if="!isRefreshingQuote" class="w-5 h-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                    </path>
                                 </svg>
-                                <svg v-else class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                <svg v-else class="w-5 h-5 animate-spin" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                    </path>
                                 </svg>
                             </button>
                         </div>
@@ -248,30 +303,38 @@ const refreshQuote = async () => {
 
                 <!-- Search and Filters Section -->
                 <div class="mb-6  bg-white shadow-sm sm:rounded-lg">
+
                     <div class="p-6">
+
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+                                Task Manager Dashboard
+                            </h2>
+                            <a :href="route('tasks.create')"
+                                class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                Create New Task
+                            </a>
+                        </div>
+
                         <!-- Search Bar -->
-                        <div class="mb-4">
+                        <div class="mb-4 mt-4">
                             <label for="search" class="sr-only">Search tasks</label>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                                     </svg>
                                 </div>
-                                <input
-                                    id="search"
-                                    v-model="searchQuery"
-                                    type="text"
+                                <input id="search" v-model="searchQuery" type="text"
                                     class="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Search tasks by title, status, or tags..."
-                                />
+                                    placeholder="Search tasks by title, status, or tags..." />
                                 <div v-if="searchQuery" class="absolute inset-y-0 right-0 flex items-center pr-3">
-                                    <button
-                                        @click="clearSearch"
-                                        class="text-gray-400 hover:text-gray-600"
-                                    >
+                                    <button @click="clearSearch" class="text-gray-400 hover:text-gray-600">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M6 18L18 6M6 6l12 12"></path>
                                         </svg>
                                     </button>
                                 </div>
@@ -285,11 +348,8 @@ const refreshQuote = async () => {
                                 <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">
                                     Filter by Status
                                 </label>
-                                <select
-                                    id="status-filter"
-                                    v-model="statusFilter"
-                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                >
+                                <select id="status-filter" v-model="statusFilter"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">All Statuses</option>
                                     <option value="pending">Pending</option>
                                     <option value="in-progress">In Progress</option>
@@ -303,83 +363,73 @@ const refreshQuote = async () => {
                                     Filter by Tags
                                 </label>
                                 <div class="relative">
-                                    <button
-                                        @click="showTagDropdown = !showTagDropdown"
-                                        type="button"
-                                        class="block w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                    >
+                                    <button @click="showTagDropdown = !showTagDropdown" type="button"
+                                        class="block w-full px-3 py-2 text-left border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white">
                                         <span v-if="tagFilters.length === 0" class="text-gray-500">
                                             Select tags...
                                         </span>
                                         <span v-else class="text-gray-900">
                                             {{ tagFilters.length }} tag{{ tagFilters.length !== 1 ? 's' : '' }} selected
                                         </span>
-                                        <svg class="absolute right-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        <svg class="absolute right-3 top-2.5 w-5 h-5 text-gray-400" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7"></path>
                                         </svg>
                                     </button>
-                                    
+
                                     <!-- Tag Dropdown -->
-                                    <div v-if="showTagDropdown" class="absolute z-99999 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-120 overflow-auto">
+                                    <div v-if="showTagDropdown"
+                                        class="absolute z-99999 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-120 overflow-auto">
                                         <div class="p-2">
-                                            <div v-if="availableTags.length === 0" class="px-3 py-2 text-sm text-gray-500">
+                                            <div v-if="availableTags.length === 0"
+                                                class="px-3 py-2 text-sm text-gray-500">
                                                 No tags available
                                             </div>
                                             <div v-else>
-                                                <!-- Tag Search Input -->   
+                                                <!-- Tag Search Input -->
                                                 <div class="mb-2 relative">
-                                                    <input
-                                                        v-model="tagSearchQuery"
-                                                        type="text"
+                                                    <input v-model="tagSearchQuery" type="text"
                                                         placeholder="Search tags..."
-                                                        class="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                                    />
-                                                    <button
-                                                        v-if="tagSearchQuery"
-                                                        @click="tagSearchQuery = ''"
-                                                        class="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        class="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" />
+                                                    <button v-if="tagSearchQuery" @click="tagSearchQuery = ''"
+                                                        class="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                         </svg>
                                                     </button>
                                                 </div>
-                                                
+
                                                 <!-- Select All / Clear All -->
-                                                <div class="flex justify-between items-center px-3 py-2 border-b border-gray-200 mb-2">
+                                                <div
+                                                    class="flex justify-between items-center px-3 py-2 border-b border-gray-200 mb-2">
                                                     <div class="flex space-x-2">
-                                                        <button
-                                                            @click="tagFilters = [...availableTags]"
-                                                            class="text-xs text-blue-600 hover:text-blue-800"
-                                                        >
+                                                        <button @click="tagFilters = [...availableTags]"
+                                                            class="text-xs text-blue-600 hover:text-blue-800">
                                                             Select All
                                                         </button>
-                                                        <button
-                                                            @click="tagFilters = []"
-                                                            class="text-xs text-gray-600 hover:text-gray-800"
-                                                        >
+                                                        <button @click="tagFilters = []"
+                                                            class="text-xs text-gray-600 hover:text-gray-800">
                                                             Clear All
                                                         </button>
                                                     </div>
                                                     <div v-if="tagSearchQuery" class="text-xs text-gray-500">
-                                                        {{ filteredAvailableTags.length }} of {{ availableTags.length }} tags
+                                                        {{ filteredAvailableTags.length }} of {{ availableTags.length }}
+                                                        tags
                                                     </div>
                                                 </div>
                                                 <div class="space-y-1 h-200 overflow-auto">
-                                                    <div v-if="filteredAvailableTags.length === 0" class="px-3 py-2 text-sm text-gray-500">
+                                                    <div v-if="filteredAvailableTags.length === 0"
+                                                        class="px-3 py-2 text-sm text-gray-500">
                                                         No tags found matching "{{ tagSearchQuery }}"
                                                     </div>
-                                                    <label
-                                                        v-for="tag in filteredAvailableTags"
-                                                        :key="tag"
-                                                        class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 rounded cursor-pointer"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            :checked="isTagSelected(tag)"
+                                                    <label v-for="tag in filteredAvailableTags" :key="tag"
+                                                        class="flex items-center px-3 py-2 text-sm hover:bg-gray-100 rounded cursor-pointer">
+                                                        <input type="checkbox" :checked="isTagSelected(tag)"
                                                             @change="toggleTag(tag)"
-                                                            class="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                        />
+                                                            class="mr-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                                         <span class="flex-1">{{ tag }}</span>
                                                     </label>
                                                 </div>
@@ -390,11 +440,9 @@ const refreshQuote = async () => {
                             </div>
 
                             <!-- Clear Filters Button -->
-                            <div class="flex items-end">
-                                <button
-                                    @click="clearFilters"
-                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
+                            <div class="flex items-end mt-5">
+                                <button @click="clearFilters"
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     Clear Filters
                                 </button>
                             </div>
@@ -404,93 +452,86 @@ const refreshQuote = async () => {
                         <div class="mt-4">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Quick Filters:</label>
                             <div class="flex flex-wrap gap-2">
-                                <button
-                                    @click="statusFilter = ''"
-                                    :class="[
-                                        'px-3 py-1 text-xs font-medium rounded-full border',
-                                        !statusFilter 
-                                            ? 'bg-blue-100 text-blue-800 border-blue-200' 
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                    ]"
-                                >
+                                <button @click="statusFilter = ''" :class="[
+                                    'px-3 py-1 text-xs font-medium rounded-full border',
+                                    !statusFilter
+                                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                ]">
                                     All
                                 </button>
-                                <button
-                                    @click="statusFilter = 'pending'"
-                                    :class="[
-                                        'px-3 py-1 text-xs font-medium rounded-full border',
-                                        statusFilter === 'pending' 
-                                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200' 
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                    ]"
-                                >
+                                <button @click="statusFilter = 'pending'" :class="[
+                                    'px-3 py-1 text-xs font-medium rounded-full border',
+                                    statusFilter === 'pending'
+                                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                ]">
                                     Pending
                                 </button>
-                                <button
-                                    @click="statusFilter = 'in-progress'"
-                                    :class="[
-                                        'px-3 py-1 text-xs font-medium rounded-full border',
-                                        statusFilter === 'in-progress' 
-                                            ? 'bg-blue-100 text-blue-800 border-blue-200' 
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                    ]"
-                                >
+                                <button @click="statusFilter = 'in-progress'" :class="[
+                                    'px-3 py-1 text-xs font-medium rounded-full border',
+                                    statusFilter === 'in-progress'
+                                        ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                ]">
                                     In Progress
                                 </button>
-                                <button
-                                    @click="statusFilter = 'completed'"
-                                    :class="[
-                                        'px-3 py-1 text-xs font-medium rounded-full border',
-                                        statusFilter === 'completed' 
-                                            ? 'bg-green-100 text-green-800 border-green-200' 
-                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                    ]"
-                                >
+                                <button @click="statusFilter = 'completed'" :class="[
+                                    'px-3 py-1 text-xs font-medium rounded-full border',
+                                    statusFilter === 'completed'
+                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                ]">
                                     Completed
                                 </button>
                             </div>
                         </div>
 
                         <!-- Active Filters Summary -->
-                        <div v-if="searchQuery || statusFilter || tagFilters.length > 0" class="mt-4 p-3 bg-blue-50 rounded-md">
+                        <div v-if="searchQuery || statusFilter || tagFilters.length > 0"
+                            class="mt-4 p-3 bg-blue-50 rounded-md">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-2">
                                     <span class="text-sm font-medium text-blue-800">Active Filters:</span>
                                     <div class="flex flex-wrap gap-2">
-                                        <span v-if="searchQuery" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
+                                        <span v-if="searchQuery"
+                                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
                                             Search: "{{ searchQuery }}"
                                             <button @click="clearSearch" class="ml-1 text-blue-500 hover:text-blue-700">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                 </svg>
                                             </button>
                                         </span>
-                                        <span v-if="statusFilter" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
+                                        <span v-if="statusFilter"
+                                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
                                             Status: {{ statusFilter.replace('-', ' ') }}
-                                            <button @click="statusFilter = ''" class="ml-1 text-blue-500 hover:text-blue-700">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            <button @click="statusFilter = ''"
+                                                class="ml-1 text-blue-500 hover:text-blue-700">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                 </svg>
                                             </button>
                                         </span>
-                                        <span
-                                            v-for="tag in tagFilters"
-                                            :key="tag"
-                                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full"
-                                        >
+                                        <span v-for="tag in tagFilters" :key="tag"
+                                            class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
                                             Tag: {{ tag }}
-                                            <button @click="toggleTag(tag)" class="ml-1 text-blue-500 hover:text-blue-700">
-                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            <button @click="toggleTag(tag)"
+                                                class="ml-1 text-blue-500 hover:text-blue-700">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                 </svg>
                                             </button>
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    @click="clearFilters"
-                                    class="text-sm text-blue-600 hover:text-blue-800"
-                                >
+                                <button @click="clearFilters" class="text-sm text-blue-600 hover:text-blue-800">
                                     Clear All
                                 </button>
                             </div>
@@ -498,7 +539,8 @@ const refreshQuote = async () => {
 
                         <!-- Results Counter -->
                         <div class="mt-4 text-sm text-gray-500">
-                            {{ tasks.length }} task{{ tasks.length !== 1 ? 's' : '' }} found
+                            Showing {{ paginationInfo.from }} to {{ paginationInfo.to }} of {{ paginationInfo.total }}
+                            task{{ paginationInfo.total !== 1 ? 's' : '' }}
                         </div>
                     </div>
                 </div>
@@ -507,33 +549,28 @@ const refreshQuote = async () => {
                 <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="mb-4 text-lg font-medium text-gray-900">All Tasks</h3>
-                        
-                        <div v-if="tasks.length === 0" class="text-center py-8">
+
+                        <div v-if="tasks.data.length === 0" class="text-center py-8">
                             <p class="text-gray-500">No tasks found. Create your first task!</p>
                         </div>
 
                         <div v-else class="space-y-4">
-                            <div
-                                v-for="task in tasks"
-                                :key="task.id"
-                                class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                            >
+                            <div v-for="task in tasks.data" :key="task.id"
+                                class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
                                 <div class="flex items-start justify-between">
                                     <div class="flex-1">
                                         <div class="flex items-center space-x-3">
                                             <h4 class="text-lg font-medium text-gray-900">{{ task.title }}</h4>
-                                            <span
-                                                :class="getStatusColor(task.status)"
-                                                class="px-2 py-1 text-xs font-medium rounded-full"
-                                            >
+                                            <span :class="getStatusColor(task.status)"
+                                                class="px-2 py-1 text-xs font-medium rounded-full">
                                                 {{ task.status.replace('-', ' ') }}
                                             </span>
                                         </div>
-                                        
+
                                         <p v-if="task.description" class="mt-2 text-gray-600">
                                             {{ task.description }}
                                         </p>
-                                        
+
                                         <div class="flex items-center mt-3 space-x-4 text-sm text-gray-500">
                                             <span v-if="task.due_date">
                                                 Due: {{ new Date(task.due_date).toLocaleDateString() }}
@@ -542,14 +579,11 @@ const refreshQuote = async () => {
                                                 Created: {{ new Date(task.created_at).toLocaleDateString() }}
                                             </span>
                                         </div>
-                                        
+
                                         <!-- Tags -->
                                         <div v-if="task.tags && task.tags.length > 0" class="flex flex-wrap mt-2 gap-1">
-                                            <span
-                                                v-for="tag in task.tags"
-                                                :key="tag"
-                                                class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full"
-                                            >
+                                            <span v-for="tag in task.tags" :key="tag"
+                                                class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
                                                 {{ tag }}
                                             </span>
                                         </div>
@@ -557,40 +591,84 @@ const refreshQuote = async () => {
 
                                     <div class="flex items-center space-x-2">
                                         <!-- Status Update -->
-                                        <select
-                                            :value="task.status"
+                                        <select :value="task.status"
                                             @change="updateTaskStatus(task.id, $event.target.value)"
-                                            class="px-8 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
+                                            class="px-8 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
                                             <option value="pending">Pending</option>
                                             <option value="in-progress">In Progress</option>
                                             <option value="completed">Completed</option>
                                         </select>
 
                                         <!-- View Button -->
-                                        <a
-                                            :href="route('tasks.show', task.id)"
-                                            class="px-3 py-1 text-sm text-green-600 hover:text-green-800"
-                                        >
+                                        <a :href="route('tasks.show', task.id)"
+                                            class="px-3 py-1 text-sm text-green-600 hover:text-green-800">
                                             View
                                         </a>
 
                                         <!-- Edit Button -->
-                                        <a
-                                            :href="route('tasks.edit', task.id)"
-                                            class="px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
-                                        >
+                                        <a :href="route('tasks.edit', task.id)"
+                                            class="px-3 py-1 text-sm text-blue-600 hover:text-blue-800">
                                             Edit
                                         </a>
 
                                         <!-- Delete Button -->
-                                        <button
-                                            @click="deleteTask(task.id)"
-                                            class="px-3 py-1 text-sm text-red-600 hover:text-red-800"
-                                        >
+                                        <button @click="deleteTask(task.id)"
+                                            class="px-3 py-1 text-sm text-red-600 hover:text-red-800">
                                             Delete
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pagination Controls -->
+                        <div v-if="paginationInfo.total > 0" class="mt-6">
+                            <div class="flex items-center justify-between">
+                                <!-- Per Page Selector -->
+                                <div class="flex items-center space-x-2">
+                                    <label class="text-sm text-gray-700">Show:</label>
+                                    <select :value="paginationInfo.perPage" @change="changePerPage($event.target.value)"
+                                        class="px-8 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="5">5</option>
+                                        <option value="10">10</option>
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                    </select>
+                                    <span class="text-sm text-gray-700">per page</span>
+                                </div>
+
+                                <!-- Pagination Info -->
+                                <div class="text-sm text-gray-700">
+                                    Page {{ paginationInfo.currentPage }} of {{ paginationInfo.lastPage }}
+                                </div>
+
+                                <!-- Pagination Navigation -->
+                                <div class="flex items-center space-x-1">
+                                    <!-- Previous Page -->
+                                    <button @click="goToPage(paginationInfo.currentPage - 1)"
+                                        :disabled="!paginationInfo.hasPreviousPages"
+                                        class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Previous
+                                    </button>
+
+                                    <!-- Page Numbers -->
+                                    <template v-for="link in paginationLinks" :key="link.label">
+                                        <button v-if="link.url && !link.active" @click="goToPage(parseInt(link.label))"
+                                            class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
+                                            {{ link.label }}
+                                        </button>
+                                        <span v-else-if="link.active"
+                                            class="px-3 py-1 text-sm bg-blue-500 text-white border border-blue-500 rounded-md">
+                                            {{ link.label }}
+                                        </span>
+                                    </template>
+
+                                    <!-- Next Page -->
+                                    <button @click="goToPage(paginationInfo.currentPage + 1)"
+                                        :disabled="!paginationInfo.hasMorePages"
+                                        class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Next
+                                    </button>
                                 </div>
                             </div>
                         </div>
