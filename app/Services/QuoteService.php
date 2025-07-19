@@ -45,9 +45,9 @@ class QuoteService
             Log::error('Quote API error: ' . $e->getMessage());
             
             return [
-                'content' => 'The only way to do great work is to love what you do.',
-                'author' => 'Steve Jobs',
-                'tags' => ['motivation', 'success'],
+                'content' => '',
+                'author' => '',
+                'tags' => [''],
                 'success' => false
             ];
         }
