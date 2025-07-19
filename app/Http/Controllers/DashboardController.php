@@ -53,12 +53,12 @@ class DashboardController extends Controller
             ->unique()
             ->sort()
             ->values();
-        
+
+
         // Get motivational quote
         $quoteService = new QuoteService();
         $quote = $quoteService->getCachedQuote();
 
-    
         return Inertia::render('Dashboard', [
             'tasks' => $tasks,
             'search' => $search,
@@ -78,13 +78,5 @@ class DashboardController extends Controller
         $quote = $quoteService->refreshQuote();
         
         return response()->json($quote);
-    }
-
-    /**
-     * Redirect to API endpoint for quote refresh
-     */
-    public function redirectToApiQuote()
-    {
-        return redirect()->route('api.quotes.refresh');
     }
 } 

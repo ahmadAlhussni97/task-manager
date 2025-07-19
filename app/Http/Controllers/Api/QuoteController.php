@@ -81,32 +81,4 @@ class QuoteController extends Controller
             ], 500);
         }
     }
-
-    /**
-     * Get quote with specific parameters
-     */
-    public function getQuoteWithParams(Request $request): JsonResponse
-    {
-        try {
-            $params = $request->validate([
-                'tags' => 'nullable|string',
-                'maxLength' => 'nullable|integer|min:1|max:300',
-                'minLength' => 'nullable|integer|min:1|max:300',
-            ]);
-
-            $quote = $this->quoteService->getQuoteWithParams($params);
-            
-            return response()->json([
-                'success' => true,
-                'data' => $quote,
-                'message' => 'Quote fetched with parameters successfully'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch quote with parameters',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 }

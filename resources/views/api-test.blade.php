@@ -31,11 +31,6 @@
                         <code class="bg-gray-100 px-2 py-1 rounded">{{ url('/api/quotes/refresh') }}</code>
                         <span class="text-gray-600">- Refresh quote</span>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">GET</span>
-                        <code class="bg-gray-100 px-2 py-1 rounded">{{ url('/api/quotes/with-params?tags=motivation&maxLength=100') }}</code>
-                        <span class="text-gray-600">- Get quote with parameters</span>
-                    </div>
                 </div>
             </div>
 
@@ -51,9 +46,6 @@
                     </button>
                     <button onclick="testRefreshQuote()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition-colors">
                         Test Refresh Quote
-                    </button>
-                    <button onclick="testQuoteWithParams()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors">
-                        Test Quote with Params
                     </button>
                 </div>
             </div>
@@ -71,7 +63,6 @@
                 <h2 class="text-xl font-semibold mb-4">External API Information</h2>
                 <div class="space-y-2 text-sm">
                     <p><strong>API URL:</strong> <code class="bg-gray-100 px-2 py-1 rounded">https://api.quotable.io/random</code></p>
-                    <p><strong>Documentation:</strong> <a href="https://github.com/lukePeavey/quotable" target="_blank" class="text-blue-600 hover:underline">https://github.com/lukePeavey/quotable</a></p>
                     <p><strong>Parameters:</strong></p>
                     <ul class="list-disc list-inside ml-4 space-y-1">
                         <li><code>tags</code> - Filter by tags (comma-separated)</li>
@@ -130,11 +121,6 @@
 
         function testRefreshQuote() {
             makeApiCall('{{ route("api.quotes.refresh") }}', 'POST');
-        }
-
-        function testQuoteWithParams() {
-            const url = '{{ route("api.quotes.with-params") }}?tags=motivation&maxLength=100';
-            makeApiCall(url);
         }
     </script>
 </body>

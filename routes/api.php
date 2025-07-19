@@ -29,19 +29,5 @@ Route::prefix('quotes')->group(function () {
     
     // Refresh quote (clear cache and fetch new)
     Route::post('/refresh', [QuoteController::class, 'refreshQuote'])->name('api.quotes.refresh');
-    
-    // Get quote with parameters
-    Route::get('/with-params', [QuoteController::class, 'getQuoteWithParams'])->name('api.quotes.with-params');
-});
 
-// Public quote endpoints (no authentication required)
-Route::prefix('public/quotes')->group(function () {
-    // Get random quote from external API (public)
-    Route::get('/random', [QuoteController::class, 'getRandomQuote'])->name('api.public.quotes.random');
-    
-    // Get cached quote (public)
-    Route::get('/cached', [QuoteController::class, 'getCachedQuote'])->name('api.public.quotes.cached');
-    
-    // Get quote with parameters (public)
-    Route::get('/with-params', [QuoteController::class, 'getQuoteWithParams'])->name('api.public.quotes.with-params');
-}); 
+});
