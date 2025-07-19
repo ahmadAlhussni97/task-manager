@@ -39,9 +39,9 @@ class QuoteService
             
         } catch (\Exception $e) {
             return [
-                'content' => 'Success is not final, failure is not fatal: it is the courage to continue that counts.',
-                'author' => 'Winston Churchill',
-                'tags' => ['motivation', 'perseverance'],
+                'content' => '',
+                'author' => '',
+                'tags' => [''],
                 'success' => false
             ];
         }
